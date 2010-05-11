@@ -14,6 +14,12 @@ TESTFILES = [
     '_api.txt',
 ]
 
+class LocalEvent(object):
+    """test event implementation.
+    """
+    def __init__(self, name):
+        self.name = name
+
 def test_suite():
     return unittest.TestSuite([
         doctest.DocFileSuite(

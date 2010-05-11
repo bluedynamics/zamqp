@@ -32,6 +32,7 @@ setup(name='zamqp',
       install_requires=[
           'setuptools',
           'amqplib',
+          'zope.event',
       ],
       tests_require=tests_require,
       extras_require = dict(

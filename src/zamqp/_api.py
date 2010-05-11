@@ -2,6 +2,7 @@ import pickle
 import uuid
 from threading import Thread
 import amqplib.client_0_8 as amqp
+import zope.event
 
 EXCHANGE = "zamqp.broadcast.fanout"
 
@@ -91,7 +92,9 @@ class AMQPConsumer(object):
 
 class AMQPThread(Thread):
     
-    consumer = None
+    def __init__(self, consumer):
+        self.consumer = consumer
+        Thread.__init__(self)
     
     def run(self):
         self.consumer.run()
@@ -101,3 +104,24 @@ class AMQPThread(Thread):
             self.consumer.close()
         except IOError:
             pass
+
+class AMQPEventCallback(object):
+    
+    def __call__(self, payload):
+        zope.event.notify(payload)
+
+class AMQPEvent(object):
+    
+    def __init__(self, queue, props, payload):
+        self.queue = queue
+        self.props = props
+        self.payload = payload
+
+def amqp_trigger(event):
+    if not isinstance(event, AMQPEvent):
+        return
+    producer = AMQPProducer(event.queue, event.props)
+    producer(event.payload)
+    producer.close()
+
+zope.event.subscribers.append(amqp_trigger)

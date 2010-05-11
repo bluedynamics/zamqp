@@ -1,11 +1,28 @@
 AMQP Convenience
 ================
 
-Create AMQP properties for connection.
+Features
+--------
+
+    - Simple to use AMQP consumer and producer helpers
+    
+    - Mechanism to trigger events via AMQP
+
+
+Helper Classes
+--------------
+
+Create properties for AMQP connection.
 ::
 
     >>> from zamqp import AMQPProps
-    >>> props = AMQPProps()
+    >>> props = AMQPProps(host='localhost',
+    ...                   user='guest',
+    ...                   password='guest',
+    ...                   ssl=False,
+    ...                   exchange='zamqp.broadcast.fanout',
+    ...                   type='fanout',
+    ...                   realm='/data')
     >>> props
     <zamqp._api.AMQPProps object at ...>
 
@@ -16,7 +33,10 @@ Create connection.
     >>> connection = AMQPConnection('zamqp_queue', props)
     >>> connection
     <zamqp._api.AMQPConnection object at ...>
-    
+
+Access channel.
+::
+
     >>> connection.channel
     <amqplib.client_0_8.channel.Channel object at ...>
     
@@ -41,24 +61,22 @@ Create consumer thread.
 
     >>> from zamqp import AMQPConsumer
     >>> from zamqp import AMQPThread
-    >>> consumer = AMQPConsumer('zamqp_queue', AMQPProps(), callback)
-    >>> amqpthread = AMQPThread()
-    >>> amqpthread.consumer = consumer
+    >>> consumer = AMQPConsumer('zamqp_queue', props, callback)
+    >>> amqpthread = AMQPThread(consumer)
     >>> amqpthread.start()
 
 And a second consumer thread.
 ::
 
-    >>> consumer2 = AMQPConsumer('zamqp_queue', AMQPProps(), callback)
-    >>> amqpthread2 = AMQPThread()
-    >>> amqpthread2.consumer = consumer2
+    >>> consumer2 = AMQPConsumer('zamqp_queue', props, callback)
+    >>> amqpthread2 = AMQPThread(consumer2)
     >>> amqpthread2.start()
 
 Create producer and send some messages.
 ::
 
     >>> from zamqp import AMQPProducer
-    >>> producer = AMQPProducer('zamqp_queue', AMQPProps())
+    >>> producer = AMQPProducer('zamqp_queue', props)
     >>> producer('1')
     >>> producer('2')
     >>> producer(dict([(1, 1)]))
@@ -73,11 +91,70 @@ Short wait for everything to be done.
 Check received messages by callback.
 ::
 
+    >>> messages.sort()
     >>> messages
-    ['1', '2', {1: 1}, '1', '2', {1: 1}]
+    [{1: 1}, {1: 1}, '1', '1', '2', '2']
+
+
+Trigger Events
+--------------
+
+Local test event we want to fire when receiving AMQP events.
+::
+
+    >>> from zamqp.tests import LocalEvent
+
+Create a listener for LocalEvent. This gets called when AMQP events are
+received.
+::
+
+    >>> handled_events = list()
+    >>> def local_listener(event):
+    ...     if not isinstance(event, LocalEvent):
+    ...         return
+    ...     handled_events.append(event.name)
+
+    >>> import zope.event
+    >>> zope.event.subscribers.append(local_listener) 
+
+The default ``AMQPEventCallback`` just calls ``zope.event.notify`` with the
+received payload.
+
+Lets start our AMQP consumer for events.
+::
+
+    >>> exchange = 'zamqp.events.fanout'
+    >>> queue = 'zamqp_events'
+    >>> from zamqp import AMQPEventCallback
+    >>> props = AMQPProps(exchange=exchange)
+    >>> callback = AMQPEventCallback()
+    >>> consumer = AMQPConsumer(queue, props, callback)
+    >>> eventthread = AMQPThread(consumer)
+    >>> eventthread.start()
+    
+Trigger some remote events.
+::
+
+    >>> from zamqp import AMQPEvent
+    >>> event = AMQPEvent(queue, props, LocalEvent('event-1'))
+    >>> zope.event.notify(event)
+    >>> event = AMQPEvent(queue, props, LocalEvent('event-2'))
+    >>> zope.event.notify(event)
+    
+Short wait for everything to be done.
+::
+
+    >>> time.sleep(0.1)
+
+Check if local event handler was triggered.
+::
+
+    >>> handled_events
+    ['event-1', 'event-2']
 
 Shutdown.
 ::
 
     >>> amqpthread.close()
     >>> amqpthread2.close()
+    >>> eventthread.close()
