@@ -1,0 +1,20 @@
+AMQP Convenience
+================
+
+    >>> from zamqp import AMQPProps
+    >>> props = AMQPProps('my_queue_name',
+    ...                   host='localhost',
+    ...                   user='guest',
+    ...                   password='guest',
+    ...                   ssl=False')
+    
+    >>> from zamqp import AMQPConnection
+    >>> connection = AMQPConnection('r', props)
+    >>> connection.channel
+    >>> connection.close
+    >>> connection.channel
+    >>> connection = AMQPConnection('w', props)
+    >>> connection.channel
+    >>> connection.close
+    >>> connection.channel
+    

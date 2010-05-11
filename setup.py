@@ -26,9 +26,9 @@ setup(name='zamqp',
       namespace_packages=[],
       include_package_data=True,
       zip_safe=False,
+      test_suite="zamqp.tests.test_suite",
       install_requires=[
           'setuptools',
-          'zope.component',
           'amqplib',
       ],
       extras_require = dict(
