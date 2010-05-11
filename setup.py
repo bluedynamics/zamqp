@@ -4,9 +4,7 @@ import sys, os
 version = '1.0'
 shortdesc = 'AMQP hook for zope events.'
 longdesc = open(os.path.join(os.path.dirname(__file__), 'README.txt')).read()
-
 tests_require = ['interlude']
-
 setup(name='zamqp',
       version=version,
       description=shortdesc,
@@ -28,12 +26,12 @@ setup(name='zamqp',
       namespace_packages=[],
       include_package_data=True,
       zip_safe=False,
-      test_suite="zamqp.tests.test_suite",
       install_requires=[
           'setuptools',
           'amqplib',
           'zope.event',
       ],
+      test_suite="zamqp.tests.test_suite",
       tests_require=tests_require,
       extras_require = dict(
           test=tests_require
