@@ -11,15 +11,14 @@ AMQP Convenience
     <zamqp._api.AMQPProps object at ...>
     
     >>> from zamqp import AMQPConnection
-    >>> #connection = AMQPConnection('r', props)
-    >>> #connection
+    >>> connection = AMQPConnection('r', props)
+    >>> connection
     <zamqp._api.AMQPConnection object at ...>
     
-    >>> #connection.channel
+    >>> connection.channel
     <amqplib.client_0_8.channel.Channel object at ...>
     
-    >>> #connection.close()
-    >>> #connection.channel
+    >>> connection.channel.close()
     
     >>> class Callback(object):
     ... 
@@ -27,7 +26,6 @@ AMQP Convenience
     ...         self.messages = messages
     ... 
     ...     def __call__(self, message):
-    ...         print message
     ...         self.messages.append(message)
     
     >>> messages = list()
@@ -35,10 +33,10 @@ AMQP Convenience
     
     >>> from zamqp import AMQPConsumer
     >>> from zamqp import AMQPThread
-    >>> #comsumer = AMQPConsumer(props, callback)
-    >>> #amqpthread = AMQPThread()
-    >>> #amqpthread.consumer = comsumer
-    >>> #amqpthread.start()
+    >>> consumer = AMQPConsumer(props, callback)
+    >>> amqpthread = AMQPThread()
+    >>> amqpthread.consumer = consumer
+    >>> amqpthread.start()
     
     >>> from zamqp import AMQPProducer
     >>> producer = AMQPProducer(props)
@@ -46,7 +44,16 @@ AMQP Convenience
     >>> producer('2')
     >>> producer('3')
     
-    >>> #amqpthread.close()
+    >>> import time
+    >>> time.sleep(1)
     
-    >>> #messages
-    []
+XXX: clean connection shutdown.
+::
+
+    >>> amqpthread.close()
+    Traceback (most recent call last):
+      ...
+    IOError: Socket closed
+    
+    >>> messages
+    ['1', '2', '3']

@@ -77,7 +77,11 @@ class AMQPConsumer(object):
         props = self.connection.props
         channel.basic_consume(props.queue, callback=self.perform, no_ack=True)
         while channel.callbacks:
-            channel.wait()
+            try:
+                channel.wait()
+            except Exception:
+                # XXX: change this when refactoring to clean shutdown.
+                pass
         
     def close(self):
         # XXX: hack, this is not a clean channel shutdown!!!
