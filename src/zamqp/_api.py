@@ -5,14 +5,10 @@ import amqplib.client_0_8 as amqp
 
 EXCHANGE = "zamqp.broadcast.fanout"
 
-client_uuid = str(uuid.uuid1())
-
 class AMQPProps(object):
     
-    def __init__(self, queue, host='localhost', user='guest', password='guest',
-                 ssl=False, exchange=EXCHANGE, type='fanout', realm='/data',
-                 mode='r'):
-        self.queue = queue
+    def __init__(self, host='localhost', user='guest', password='guest',
+                 ssl=False, exchange=EXCHANGE, type='fanout', realm='/data'):
         self.host = host
         self.user = user
         self.password = password
@@ -20,12 +16,13 @@ class AMQPProps(object):
         self.exchange = exchange
         self.type = type
         self.realm = realm
-        self.mode = mode
 
 class AMQPConnection(object):
 
-    def __init__(self, props):
+    def __init__(self, queue, props, mode='w'):
+        self.queue = queue
         self.props = props
+        self.mode = mode
         self.connection = amqp.Connection(props.host,
                                           userid=props.user,
                                           password=props.password,
@@ -35,17 +32,16 @@ class AMQPConnection(object):
     def channel(self):
         if hasattr(self, '_channel'):
             return self._channel
+        read, write = self.mode == 'r', self.mode == 'w'
         props = self.props
-        read = props.mode == 'r'
-        write = props.mode == 'w'
         channel = self.connection.channel()
         channel.access_request(props.realm, active=True, read=read, write=write)
         channel.exchange_declare(props.exchange, type=props.type,
                                  durable=False, auto_delete=False)
         if read:
-            channel.queue_declare(props.queue, durable=False,
+            channel.queue_declare(self.queue, durable=False,
                                   exclusive=True, auto_delete=True)
-            channel.queue_bind(props.queue, props.exchange, props.queue)
+            channel.queue_bind(self.queue, props.exchange, self.queue)
         self._channel = channel
         return channel
     
@@ -54,25 +50,24 @@ class AMQPConnection(object):
 
 class AMQPProducer(object):
     
-    def __init__(self, props):
-        props.mode = 'w'
-        self.connection = AMQPConnection(props)
+    def __init__(self, queue, props):
+        self.connection = AMQPConnection(queue, props)
+        self.props = props
 
     def __call__(self, message):
         channel = self.connection.channel
         message = amqp.Message(pickle.dumps(message))
-        channel.basic_publish(message, EXCHANGE, '')
+        channel.basic_publish(message, self.props.exchange, '')
     
     def close(self):
         self.connection.close()
 
 class AMQPConsumer(object):
     
-    def __init__(self, props, callback):
-        queue = '%s_%s' % (props.queue, client_uuid)
-        props = AMQPProps(queue, host=props.host, user=props.user,
-                          password=props.password, ssl=props.ssl)
-        self.connection = AMQPConnection(props)
+    def __init__(self, queue, props, callback):
+        id = str(uuid.uuid1())
+        self.queue = '%s_%s' % (queue, id)
+        self.connection = AMQPConnection(self.queue, props, 'r')
         self.callback = callback
     
     def perform(self, message):
@@ -82,12 +77,12 @@ class AMQPConsumer(object):
     def run(self):
         channel = self.connection.channel
         props = self.connection.props
-        channel.basic_consume(props.queue, callback=self.perform,
+        channel.basic_consume(self.queue, callback=self.perform,
                               no_ack=True)
         while channel.callbacks:
             try:
                 channel.wait()
-            except AttributeError:
+            except AttributeError, e:
                 # XXX: figure out how to to interrupt waiting clean.
                 pass
     

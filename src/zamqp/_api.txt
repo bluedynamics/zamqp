@@ -5,11 +5,7 @@ Create AMQP properties for connection.
 ::
 
     >>> from zamqp import AMQPProps
-    >>> props = AMQPProps('my_queue_name',
-    ...                   host='localhost',
-    ...                   user='guest',
-    ...                   password='guest',
-    ...                   ssl=False)
+    >>> props = AMQPProps()
     >>> props
     <zamqp._api.AMQPProps object at ...>
 
@@ -17,7 +13,7 @@ Create connection.
 ::
     
     >>> from zamqp import AMQPConnection
-    >>> connection = AMQPConnection(props)
+    >>> connection = AMQPConnection('zamqp_queue', props)
     >>> connection
     <zamqp._api.AMQPConnection object at ...>
     
@@ -45,16 +41,24 @@ Create consumer thread.
 
     >>> from zamqp import AMQPConsumer
     >>> from zamqp import AMQPThread
-    >>> consumer = AMQPConsumer(props, callback)
+    >>> consumer = AMQPConsumer('zamqp_queue', AMQPProps(), callback)
     >>> amqpthread = AMQPThread()
     >>> amqpthread.consumer = consumer
     >>> amqpthread.start()
+
+And a second consumer thread.
+::
+
+    >>> consumer2 = AMQPConsumer('zamqp_queue', AMQPProps(), callback)
+    >>> amqpthread2 = AMQPThread()
+    >>> amqpthread2.consumer = consumer2
+    >>> amqpthread2.start()
 
 Create producer and send some messages.
 ::
 
     >>> from zamqp import AMQPProducer
-    >>> producer = AMQPProducer(props)
+    >>> producer = AMQPProducer('zamqp_queue', AMQPProps())
     >>> producer('1')
     >>> producer('2')
     >>> producer(dict([(1, 1)]))
@@ -66,13 +70,14 @@ Short wait for everything to be done.
     >>> import time
     >>> time.sleep(0.1)
 
-Shutdown.
-::
-
-    >>> amqpthread.close()
-
 Check received messages by callback.
 ::
 
     >>> messages
-    ['1', '2', {1: 1}]
+    ['1', '2', {1: 1}, '1', '2', {1: 1}]
+
+Shutdown.
+::
+
+    >>> amqpthread.close()
+    >>> amqpthread2.close()
