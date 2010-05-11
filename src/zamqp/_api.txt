@@ -6,15 +6,43 @@ AMQP Convenience
     ...                   host='localhost',
     ...                   user='guest',
     ...                   password='guest',
-    ...                   ssl=False')
+    ...                   ssl=False)
+    >>> props
+    <zamqp._api.AMQPProps object at ...>
     
     >>> from zamqp import AMQPConnection
     >>> connection = AMQPConnection('r', props)
+    >>> connection
+    <zamqp._api.AMQPConnection object at ...>
+    
     >>> connection.channel
-    >>> connection.close
-    >>> connection.channel
-    >>> connection = AMQPConnection('w', props)
-    >>> connection.channel
-    >>> connection.close
+    <amqplib.client_0_8.channel.Channel object at ...>
+    
+    >>> connection.close()
     >>> connection.channel
     
+    >>> from zamqp import AMQPThread
+    >>> messages = list()
+    
+    >>> class Callback(object):
+    ... 
+    ...     def __init__(self, messages):
+    ...         self.messages = messages
+    ... 
+    ...     def __call__(self, message):
+    ...         self.messages.append(message)
+    
+    >>> callback = Callback(messages)
+    
+    >>> amqpthread = AMQPThread(props, callback)
+    >>> amqpthread.start()
+    
+    >>> from zamqp import AMQPProducer
+    >>> #producer = AMQPProducer(props)
+    >>> #producer('1')
+    >>> #producer('2')
+    >>> #producer('3')
+    
+    >>> amqpthread.close()
+    
+    >>> messages

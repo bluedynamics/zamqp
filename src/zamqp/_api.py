@@ -1,13 +1,7 @@
 import pickle
-import os
 import uuid
-import logging
+from threading import Thread
 import amqplib.client_0_8 as amqp
-from time import (
-    time,
-    strftime,
-    localtime,
-)
 
 EXCHANGE = "zamqp.broadcast.fanout"
 
@@ -15,81 +9,91 @@ client_uuid = str(uuid.uuid1())
 
 class AMQPProps(object):
     
-    def __init__(self, queue, host='localhost', user='guest',
-                 password='guest', ssl=False):
+    def __init__(self,
+                 queue,
+                 host='localhost',
+                 user='guest',
+                 password='guest',
+                 ssl=False,
+                 exchange=EXCHANGE):
         self.queue = queue
         self.host = host
         self.user = user
         self.password = password
         self.ssl = ssl
+        self.exchange = exchange
 
 class AMQPConnection(object):
 
-    def __init__(self, mode, queue_name, props):
+    def __init__(self, mode, props):
         self.mode = mode
         self.props = props
-        read = mode == 'r'
-        write = mode == 'w'
+        self.channel = None
+        self.connect()
+    
+    def connect(self):
+        read = self.mode == 'r'
+        write = self.mode == 'w'
+        props = self.props
         conn = amqp.Connection(props.host,
                                userid=props.user,
                                password=props.password,
                                ssl=props.ssl)
         ch = conn.channel()
         ch.access_request('/data', active=True, read=read, write=write)
-        ch.exchange_declare(EXCHANGE, 'fanout',
+        ch.exchange_declare(props.exchange, 'fanout',
                             durable=False, auto_delete=False)
         if read:
             qname, n_msgs, n_consumers = ch.queue_declare(
                 props.queue, durable=False, exclusive=True, auto_delete=True)
-            ch.queue_bind(props.queue, EXCHANGE, props.queue)
+            ch.queue_bind(props.queue, props.exchange, props.queue)
         self.channel = ch
     
     def close(self):
         self.channel.close()
+        self.channel = None
 
-#>>> from threading import Thread
-#    >>> from zodict.locking import TreeLock
-#    >>> class TestThread(Thread):
-#    ...     def run(self):
-#    ...         self._waited = False
-#    ...         while dummy._waiting:
-#    ...             self._waited = True
-#    ...             time.sleep(3)
-#    ...         lock = TreeLock(dummy)
-#    ...         lock.acquire()
-#    ...         dummy._waiting = True
-#    ...         time.sleep(1)
-#    ...         dummy._waiting = False
-#    ...         lock.release()
-#
-#    >>> t1 = TestThread()
-#    >>> t2 = TestThread()
-#    >>> t1.start()
-#    >>> t2.start()
-
-class Producer(object):
+class AMQPProducer(object):
     
     def __init__(self, props):
         self.connection = AMQPConnection('w', props)
-        self.ch = setup_amqp('w', queue_name="logger")
 
-    def message(self, message):
-        self.ch.basic_publish(amqp.Message(pickle.dumps(message)), my_exchange, "")
+    def __call__(self, message):
+        channel = self.connection.channel
+        message = amqp.Message(pickle.dumps(message))
+        channel.basic_publish(message, EXCHANGE, '')
 
-class Consumer():
-    def __init__(self, callback_function=None):
-        self.ch = setup_amqp('r',queue_name="logger_"+my_uuid)
-        self.callback_function = callback_function
+class AMQPConsumer(object):
     
-    def callback(self, msg):
-        message = pickle.loads(msg.body)
-        if(self.callback_function):
-            self.callback_function(message)
+    def __init__(self, props, callback):
+        queue = '%s_%s' % (props.queue, client_uuid)
+        props = AMQPProps(queue, host=props.host, user=props.user,
+                          password=props.password, ssl=props.ssl)
+        self.connection = AMQPConnection('w', props)
+        self.callback = callback
+    
+    def perform(self, message):
+        message = pickle.loads(message.body)
+        self.callback(message)
 
-    def consume_forever(self):
-        self.ch.basic_consume("logger_"+my_uuid, callback=self.callback, no_ack=True)
-        while self.ch.callbacks:
-            self.ch.wait()
+    def run(self):
+        channel = self.connection.channel
+        props = self.connection.props
+        channel.basic_consume(props.queue, callback=self.perform, no_ack=True)
+        while channel.callbacks:
+            channel.wait()
 
     def close(self):
-        self.ch.close()
+        self.connection.close()
+
+class AMQPThread(Thread):
+    
+    def __init__(self, props, callback):
+        Thread.__init__(self)
+        self.consumer = AMQPConsumer(props, callback)
+    
+    def run(self):
+        self.consumer.run()
+    
+    def close(self):
+        self.consumer.close()
