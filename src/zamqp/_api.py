@@ -48,10 +48,6 @@ class AMQPConnection(object):
                 props.queue, durable=False, exclusive=True, auto_delete=True)
             ch.queue_bind(props.queue, props.exchange, props.queue)
         self.channel = ch
-    
-    def close(self):
-        self.channel.close()
-        self.channel = None
 
 class AMQPProducer(object):
     
@@ -69,7 +65,7 @@ class AMQPConsumer(object):
         queue = '%s_%s' % (props.queue, client_uuid)
         props = AMQPProps(queue, host=props.host, user=props.user,
                           password=props.password, ssl=props.ssl)
-        self.connection = AMQPConnection('w', props)
+        self.connection = AMQPConnection('r', props)
         self.callback = callback
     
     def perform(self, message):
@@ -82,15 +78,14 @@ class AMQPConsumer(object):
         channel.basic_consume(props.queue, callback=self.perform, no_ack=True)
         while channel.callbacks:
             channel.wait()
-
+        
     def close(self):
-        self.connection.close()
+        # XXX: hack, this is not a clean channel shutdown!!!
+        self.connection.channel.connection.close()
 
 class AMQPThread(Thread):
     
-    def __init__(self, props, callback):
-        Thread.__init__(self)
-        self.consumer = AMQPConsumer(props, callback)
+    consumer = None
     
     def run(self):
         self.consumer.run()

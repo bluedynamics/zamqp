@@ -5,6 +5,8 @@ version = '1.0'
 shortdesc = 'AMQP hook for zope events.'
 longdesc = open(os.path.join(os.path.dirname(__file__), 'README.txt')).read()
 
+tests_require = ['interlude']
+
 setup(name='zamqp',
       version=version,
       description=shortdesc,
@@ -31,9 +33,8 @@ setup(name='zamqp',
           'setuptools',
           'amqplib',
       ],
+      tests_require=tests_require,
       extras_require = dict(
-          test=[
-            'interlude',
-          ]
+          test=tests_require
       ),
 )
