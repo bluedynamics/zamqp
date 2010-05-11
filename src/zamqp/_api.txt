@@ -6,7 +6,7 @@ Features
 
     - Simple to use AMQP consumer and producer helpers
     
-    - Mechanism to trigger events via AMQP
+    - Mechanism to trigger remote events via AMQP
 
 
 Helper Classes
