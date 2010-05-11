@@ -1,6 +1,9 @@
 AMQP Convenience
 ================
 
+Create AMQP properties for connection.
+::
+
     >>> from zamqp import AMQPProps
     >>> props = AMQPProps('my_queue_name',
     ...                   host='localhost',
@@ -9,17 +12,23 @@ AMQP Convenience
     ...                   ssl=False)
     >>> props
     <zamqp._api.AMQPProps object at ...>
+
+Create connection.
+::
     
     >>> from zamqp import AMQPConnection
-    >>> connection = AMQPConnection('r', props)
+    >>> connection = AMQPConnection(props)
     >>> connection
     <zamqp._api.AMQPConnection object at ...>
     
     >>> connection.channel
     <amqplib.client_0_8.channel.Channel object at ...>
     
-    >>> connection.channel.close()
-    
+    >>> connection.close()
+
+Dummy callback.
+::
+
     >>> class Callback(object):
     ... 
     ...     def __init__(self, messages):
@@ -30,30 +39,40 @@ AMQP Convenience
     
     >>> messages = list()
     >>> callback = Callback(messages)
-    
+
+Create consumer thread.
+::
+
     >>> from zamqp import AMQPConsumer
     >>> from zamqp import AMQPThread
     >>> consumer = AMQPConsumer(props, callback)
     >>> amqpthread = AMQPThread()
     >>> amqpthread.consumer = consumer
     >>> amqpthread.start()
-    
+
+Create producer and send some messages.
+::
+
     >>> from zamqp import AMQPProducer
     >>> producer = AMQPProducer(props)
     >>> producer('1')
     >>> producer('2')
-    >>> producer('3')
-    
+    >>> producer(dict([(1, 1)]))
+    >>> producer.close()
+
+Short wait for everything to be done.
+::
+
     >>> import time
-    >>> time.sleep(1)
-    
-XXX: clean connection shutdown.
+    >>> time.sleep(0.1)
+
+Shutdown.
 ::
 
     >>> amqpthread.close()
-    Traceback (most recent call last):
-      ...
-    IOError: Socket closed
-    
+
+Check received messages by callback.
+::
+
     >>> messages
-    ['1', '2', '3']
+    ['1', '2', {1: 1}]

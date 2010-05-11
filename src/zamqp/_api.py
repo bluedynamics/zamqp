@@ -9,55 +9,62 @@ client_uuid = str(uuid.uuid1())
 
 class AMQPProps(object):
     
-    def __init__(self,
-                 queue,
-                 host='localhost',
-                 user='guest',
-                 password='guest',
-                 ssl=False,
-                 exchange=EXCHANGE):
+    def __init__(self, queue, host='localhost', user='guest', password='guest',
+                 ssl=False, exchange=EXCHANGE, type='fanout', realm='/data',
+                 mode='r'):
         self.queue = queue
         self.host = host
         self.user = user
         self.password = password
         self.ssl = ssl
         self.exchange = exchange
+        self.type = type
+        self.realm = realm
+        self.mode = mode
 
 class AMQPConnection(object):
 
-    def __init__(self, mode, props):
-        self.mode = mode
+    def __init__(self, props):
         self.props = props
-        self.channel = None
-        self.connect()
+        self.connection = amqp.Connection(props.host,
+                                          userid=props.user,
+                                          password=props.password,
+                                          ssl=props.ssl)
     
-    def connect(self):
-        read = self.mode == 'r'
-        write = self.mode == 'w'
+    @property
+    def channel(self):
+        if hasattr(self, '_channel'):
+            return self._channel
         props = self.props
-        conn = amqp.Connection(props.host,
-                               userid=props.user,
-                               password=props.password,
-                               ssl=props.ssl)
-        ch = conn.channel()
-        ch.access_request('/data', active=True, read=read, write=write)
-        ch.exchange_declare(props.exchange, 'fanout',
-                            durable=False, auto_delete=False)
+        read = props.mode == 'r'
+        write = props.mode == 'w'
+        channel = self.connection.channel()
+        channel.access_request(props.realm, active=True, read=read, write=write)
+        channel.exchange_declare(props.exchange, type=props.type,
+                                 durable=False, auto_delete=False)
         if read:
-            qname, n_msgs, n_consumers = ch.queue_declare(
-                props.queue, durable=False, exclusive=True, auto_delete=True)
-            ch.queue_bind(props.queue, props.exchange, props.queue)
-        self.channel = ch
+            channel.queue_declare(props.queue, durable=False,
+                                  exclusive=True, auto_delete=True)
+            channel.queue_bind(props.queue, props.exchange, props.queue)
+        self._channel = channel
+        return channel
+    
+    def close(self):
+        self.connection.close()
 
 class AMQPProducer(object):
     
     def __init__(self, props):
-        self.connection = AMQPConnection('w', props)
+        props.mode = 'w'
+        self.connection = AMQPConnection(props)
 
     def __call__(self, message):
         channel = self.connection.channel
         message = amqp.Message(pickle.dumps(message))
         channel.basic_publish(message, EXCHANGE, '')
+    
+    def close(self):
+        self.connection.close()
 
 class AMQPConsumer(object):
     
@@ -65,7 +72,7 @@ class AMQPConsumer(object):
         queue = '%s_%s' % (props.queue, client_uuid)
         props = AMQPProps(queue, host=props.host, user=props.user,
                           password=props.password, ssl=props.ssl)
-        self.connection = AMQPConnection('r', props)
+        self.connection = AMQPConnection(props)
         self.callback = callback
     
     def perform(self, message):
@@ -75,17 +82,17 @@ class AMQPConsumer(object):
     def run(self):
         channel = self.connection.channel
         props = self.connection.props
-        channel.basic_consume(props.queue, callback=self.perform, no_ack=True)
+        channel.basic_consume(props.queue, callback=self.perform,
+                              no_ack=True)
         while channel.callbacks:
             try:
                 channel.wait()
-            except Exception:
-                # XXX: change this when refactoring to clean shutdown.
+            except AttributeError:
+                # XXX: figure out how to to interrupt waiting clean.
                 pass
-        
+    
     def close(self):
-        # XXX: hack, this is not a clean channel shutdown!!!
-        self.connection.channel.connection.close()
+        self.connection.close()
 
 class AMQPThread(Thread):
     
@@ -95,4 +102,7 @@ class AMQPThread(Thread):
         self.consumer.run()
     
     def close(self):
-        self.consumer.close()
+        try:
+            self.consumer.close()
+        except IOError:
+            pass
