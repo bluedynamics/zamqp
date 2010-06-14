@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 import sys, os
 
-version = '1.0'
+version = '1.0b1'
 shortdesc = 'AMQP hook for zope events.'
 longdesc = open(os.path.join(os.path.dirname(__file__), 'README.txt')).read()
 tests_require = ['interlude']
@@ -11,12 +11,10 @@ setup(name='zamqp',
       long_description=longdesc,
       classifiers=[
           'Development Status :: 4 - Beta',
-          'Environment :: Web Environment',
           'Operating System :: OS Independent',
-          'Programming Language :: Python', 
-          'Topic :: Internet :: WWW/HTTP :: Dynamic Content',        
+          'Programming Language :: Python',
       ],
-      keywords='',
+      keywords='amqp events zope',
       author='BlueDynamics Alliance',
       author_email='dev@bluedynamics.com',
       url=u'https://svn.binarybox.net/svn/ztk/zamqp',
