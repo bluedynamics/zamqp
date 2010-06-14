@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 import sys, os
 
 version = '1.0b1'
-shortdesc = 'AMQP hook for zope events.'
+shortdesc = 'AMQP broadcasting for python and zope.'
 longdesc = open(os.path.join(os.path.dirname(__file__), 'README.txt')).read()
 tests_require = ['interlude']
 setup(name='zamqp',
