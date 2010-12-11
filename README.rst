@@ -117,7 +117,12 @@ Credits
 Changes
 =======
 
+1.0b2
+-----
+
+- add runner module [rnix, 2010-12-11]
+
 1.0b1
 -----
 
-* make it work [rnix]
+- make it work [rnix]
