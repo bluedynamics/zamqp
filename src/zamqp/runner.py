@@ -13,10 +13,11 @@ event_consumer = None
 def cleanup():
     """Close event consumer if running.
     """
+    from zamqp import runner
     logger.info('Cleanup event consumer')
-    if event_consumer:
+    if runner.event_consumer:
         try:
-            event_consumer.close()
+            runner.event_consumer.close()
             logger.info('Event consumer closed')
         except Exception, e:
             logger.error('Error while closing event consumer: %s' % str(e))
@@ -37,12 +38,13 @@ def create_consumer(props, queue):
         Queue name
     """
     cleanup()
+    from zamqp import runner
     try:
         logger.info('Starting event consumer')
         callback = AMQPEventCallback()
         consumer = AMQPThread(AMQPConsumer(queue, props, callback))
         consumer.start()
-        event_consumer = consumer
+        runner.event_consumer = consumer
         return True
     except Exception, e:
         logger.error('AMQP Error: %s %s' % (str(e.__class__), str(e)))

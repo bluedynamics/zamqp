@@ -3,8 +3,11 @@ import uuid
 from threading import Thread
 import amqplib.client_0_8 as amqp
 import zope.event
+import logging
 
+logger = logging.getLogger('zamqp')
 EXCHANGE = "zamqp.broadcast.fanout"
+
 
 class AMQPProps(object):
     
@@ -17,6 +20,7 @@ class AMQPProps(object):
         self.exchange = exchange
         self.type = type
         self.realm = realm
+
 
 class AMQPConnection(object):
 
@@ -49,6 +53,7 @@ class AMQPConnection(object):
     def close(self):
         self.connection.close()
 
+
 class AMQPProducer(object):
     
     def __init__(self, queue, props):
@@ -62,6 +67,7 @@ class AMQPProducer(object):
     
     def close(self):
         self.connection.close()
+
 
 class AMQPConsumer(object):
     
@@ -90,6 +96,7 @@ class AMQPConsumer(object):
     def close(self):
         self.connection.close()
 
+
 class AMQPThread(Thread):
     
     def __init__(self, consumer):
@@ -97,18 +104,25 @@ class AMQPThread(Thread):
         Thread.__init__(self)
     
     def run(self):
-        self.consumer.run()
+        try:
+            self.consumer.run()
+        except Exception, e:
+            logger.error('Error while running consumer: %s' % str(e))
+        logger.info('AMQP Thread terminating')
     
     def close(self):
         try:
             self.consumer.close()
         except IOError:
             pass
+        logger.info('AMQP Thread terminating')
+
 
 class AMQPEventCallback(object):
     
     def __call__(self, payload):
         zope.event.notify(payload)
+
 
 class AMQPEvent(object):
     
@@ -117,11 +131,13 @@ class AMQPEvent(object):
         self.props = props
         self.payload = payload
 
+
 def amqp_trigger(event):
     if not isinstance(event, AMQPEvent):
         return
     producer = AMQPProducer(event.queue, event.props)
     producer(event.payload)
     producer.close()
+
 
 zope.event.subscribers.append(amqp_trigger)
